@@ -66,13 +66,30 @@ class HdnNeutronPlugin(db_base_plugin_v2.NeutronDbPluginV2,
     __native_sorting_support = True
 
     # This is just an educational plugin. Only the l3 extension is supported
+    # In order to add an extension to a plugin, it is needed to:
+    # 1 - Add the corresponding mixin to the plugin's base class list
+    # 2 - Add the extension alias to the plugin's support_extension_aliases
+    #     attribute
     supported_extension_aliases = ["external-net", "router"]
 
     def __init__(self, configfile=None):
-        # Validate configuration
+        # TODO(salv-orlando): Validate configuration
         pass
 
     def create_network(self, context, network):
+        """ Instruct HDN operators to create a network
+
+        This function implements the "network create" Neutron API operation.
+
+        @param context - The Neutron context reference. This parameter holds
+        a database session (context.session), the identifier of the tenant
+        performing the operation (context.tenant_id), and other attributes
+        such as a flag to test whether the tenant is an administrator
+        (context.is_admin)
+
+        @param network - A dict containing data of the network to be created
+        """
+
         # Set the status of the network as 'PENDING CREATE'
         network['network']['status'] = STATUS_PENDING_CREATE
         with context.session.begin(subtransactions=True):
