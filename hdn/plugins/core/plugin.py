@@ -14,18 +14,18 @@
 #    License for the specific language governing permissions and limitations
 #    under the License.
 
+from oslo_log import log
 from sqlalchemy.orm import exc as sa_exc
-
 from neutron.db import db_base_plugin_v2
 from neutron.db import external_net_db
 from neutron.db import l3_db
 from neutron.db import quota_db  # noqa
 from neutron.extensions import l3
-from neutron.openstack.common import log as logging
-from neutron.plugins.hdn.common import config  # noqa
-from neutron.plugins.hdn import hdnlib
 
-LOG = logging.getLogger(__name__)
+from hdn.common import config  # noqa
+from hdn.common import hdnlib
+
+LOG = log.getLogger(__name__)
 STATUS_PENDING_CREATE = 'PENDING_CREATE'
 STATUS_PENDING_UPDATE = 'PENDING_UPDATE'
 STATUS_PENDING_DELETE = 'PENDING_DELETE'
