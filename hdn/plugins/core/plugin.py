@@ -1,4 +1,3 @@
-# vim: tabstop=4 shiftwidth=4 softtabstop=4
 # Copyright 2013 Somebody
 # All Rights Reserved.
 #
@@ -23,12 +22,10 @@ from neutron.db import quota_db  # noqa
 from neutron.extensions import l3
 
 from hdn.common import config  # noqa
+from hdn.common import constants
 from hdn.common import hdnlib
 
 LOG = log.getLogger(__name__)
-STATUS_PENDING_CREATE = 'PENDING_CREATE'
-STATUS_PENDING_UPDATE = 'PENDING_UPDATE'
-STATUS_PENDING_DELETE = 'PENDING_DELETE'
 
 
 class HdnNeutronPlugin(db_base_plugin_v2.NeutronDbPluginV2,
@@ -91,7 +88,7 @@ class HdnNeutronPlugin(db_base_plugin_v2.NeutronDbPluginV2,
         """
 
         # Set the status of the network as 'PENDING CREATE'
-        network['network']['status'] = STATUS_PENDING_CREATE
+        network['network']['status'] = constants.STATUS_PENDING_CREATE
         with context.session.begin(subtransactions=True):
             new_net = super(HdnNeutronPlugin, self).create_network(
                 context, network)
@@ -113,13 +110,14 @@ class HdnNeutronPlugin(db_base_plugin_v2.NeutronDbPluginV2,
         with context.session.begin(subtransactions=True):
             # _get_network returns a sqlalchemy model
             network = self._get_network(context, network_id)
-            if context.is_admin and network.status == STATUS_PENDING_DELETE:
+            if (context.is_admin and
+                network.status == constants.STATUS_PENDING_DELETE):
                 # the network must be removed from the DB
                 super(HdnNeutronPlugin, self).delete_network(context,
                                                              network_id)
                 return
             # Set the status of the network as 'PENDING DELETE'
-            network.status = STATUS_PENDING_DELETE
+            network.status = constants.STATUS_PENDING_DELETE
 
         hdnlib.notify_network_delete({'id': network_id,
                                       'tenant_id': context.tenant_id})
@@ -130,7 +128,7 @@ class HdnNeutronPlugin(db_base_plugin_v2.NeutronDbPluginV2,
 
     def create_port(self, context, port):
         # Set port status as PENDING_CREATE
-        port['port']['status'] = STATUS_PENDING_CREATE
+        port['port']['status'] = constants.STATUS_PENDING_CREATE
         with context.session.begin(subtransactions=True):
             new_port = super(HdnNeutronPlugin, self).create_port(
                 context, port)
@@ -151,7 +149,7 @@ class HdnNeutronPlugin(db_base_plugin_v2.NeutronDbPluginV2,
             # Notify HDN operators
             with context.session.begin(subtransactions=True):
                 db_port = self._get_port(context, port_id)
-                db_port.status = STATUS_PENDING_UPDATE
+                db_port.status = constants.STATUS_PENDING_UPDATE
             hdnlib.notify_port_update(self._make_port_dict(db_port))
             LOG.debug(_("Queued request to update port: %s"), port['id'])
         return updated_port
@@ -164,14 +162,15 @@ class HdnNeutronPlugin(db_base_plugin_v2.NeutronDbPluginV2,
         with context.session.begin(subtransactions=True):
             # _get_port returns a sqlalchemy model
             port = self._get_port(context, port_id)
-            if context.is_admin and port.status == STATUS_PENDING_DELETE:
+            if (context.is_admin and
+                port.status == constants.STATUS_PENDING_DELETE):
                 # the port must be removed from the DB
                 super(HdnNeutronPlugin, self).delete_port(context, port_id)
                 return
             # This is needed by L3 extension
             self.disassociate_floatingips(context, port_id)
-            # Put the port in PENDING_DELETE STATUS
-            port.status = STATUS_PENDING_DELETE
+            # Put the port in PENDING_DELETE constants.STATUS
+            port.status = constants.STATUS_PENDING_DELETE
         # Notify HDN operators
         hdnlib.notify_port_delete({'id': port_id,
                                    'tenant_id': context.tenant_id})
@@ -181,7 +180,7 @@ class HdnNeutronPlugin(db_base_plugin_v2.NeutronDbPluginV2,
     # in NeutronDBPluginV2 is enough for the HDN plugin
 
     def create_subnet(self, context, subnet):
-        subnet['subnet']['status'] = STATUS_PENDING_CREATE
+        subnet['subnet']['status'] = constants.STATUS_PENDING_CREATE
         new_subnet = super(HdnNeutronPlugin, self).create_subnet(
             context, subnet)
         # Notify HDN operators
@@ -191,7 +190,7 @@ class HdnNeutronPlugin(db_base_plugin_v2.NeutronDbPluginV2,
 
     def update_subnet(self, context, subnet_id, subnet):
         # Put the subnet in PENDING UPDATE status
-        subnet['subnet']['status'] = STATUS_PENDING_UPDATE
+        subnet['subnet']['status'] = constants.STATUS_PENDING_UPDATE
         upd_subnet = super(HdnNeutronPlugin, self).update_subnet(
             context, subnet_id, subnet)
         LOG.debug(_("Queued request to update subnet: %s"), subnet['id'])
@@ -204,116 +203,14 @@ class HdnNeutronPlugin(db_base_plugin_v2.NeutronDbPluginV2,
         with context.session.begin(subtransactions=True):
             # _get_subnet returns a sqlalchemy model
             subnet = self._get_subnet(context, subnet_id)
-            if context.is_admin and subnet.status == STATUS_PENDING_DELETE:
+            if (context.is_admin and
+                subnet.status == constants.STATUS_PENDING_DELETE):
                 # the subnet must be removed from the DB
                 super(HdnNeutronPlugin, self).delete_subnet(context,
                                                             subnet_id)
                 return
-            subnet.status = STATUS_PENDING_DELETE
+            subnet.status = constants.STATUS_PENDING_DELETE
         # Notify HDN operators
         hdnlib.notify_subnet_delete({'id': subnet_id,
                                      'tenant_id': context.tenant_id})
         LOG.debug(_("Queued request to delete subnet: %s"), subnet_id)
-
-    # GET operations for subnets are not redefined. The operation defined
-    # in NeutronDBPluginV2 is enough for the HDN plugin
-
-    # ******************************************
-    # Neutron L3 extension implementation
-    # *****************************************
-
-    def prevent_l3_port_deletion(self, context, port_id):
-        """Overriden from base class
-
-        This version of this method allows HDN admin operators
-        to remove service ports using the Neutron API.
-        """
-        if not context.is_admin:
-            super(HdnNeutronPlugin, self).prevent_l3_port_deletetion(
-                self, context, port_id)
-
-    def create_router(self, context, router):
-        # Put the router in PENDING CREATE
-        router['router']['status'] = STATUS_PENDING_CREATE
-        new_router = super(HdnNeutronPlugin, self).create_router(
-            context, router)
-        # Notify HDN operators
-        hdnlib.notify_router_create(new_router)
-        LOG.debug(_("Queued request to create router: %s"), new_router['id'])
-        return new_router
-
-    def update_router(self, context, router_id, router):
-        # Put the router in PENDING_UPDATE
-        router['router']['status'] = STATUS_PENDING_UPDATE
-        upd_router = super(HdnNeutronPlugin, self).update_router(
-            context, router)
-        # Notify HDN operators
-        hdnlib.notify_router_update(upd_router)
-        LOG.debug(_("Queued request to update router: %s"), router['id'])
-        return upd_router
-
-    def delete_router(self, context, router_id, router):
-        # Pre-delete checks
-        # Ensure that the router is not used
-        fips = self.get_floatingips_count(
-            context.elevated(), filters={'router_id': [router_id]})
-        if fips:
-            raise l3.RouterInUse(router_id=router_id)
-
-        device_filter = {'device_id': [router_id],
-                         'device_owner': [l3_db.DEVICE_OWNER_ROUTER_INTF]}
-        ports = self._core_plugin.get_ports_count(context.elevated(),
-                                                  filters=device_filter)
-        if ports:
-            raise l3.RouterInUse(router_id=router_id)
-        # Put the router in PENDING_DELETE status
-        with context.session.begin(subtransactions=True):
-            router = self._get_router(context, router_id)
-            router.status = STATUS_PENDING_DELETE
-        # Notify HDN operators
-        hdnlib.notify_router_delete({'id': router_id,
-                                     'tenant_id': context.tenant_id})
-        LOG.debug(_("Queued request to delete router: %s"), router_id)
-
-    # GET operations for routers are not redefined. The operation defined
-    # in NeutronDBPluginV2 is enough for the HDN plugin
-
-    def _update_fip_assoc(self, context, fip, floatingip_db, external_port):
-        """Performs association of a floating IP with a port.
-
-        This method is invoked by create_floatingip and update_floatingip.
-        """
-        super(HdnNeutronPlugin, self).update_fip_assoc(
-            context, fip, floatingip_db, external_port)
-        # Notify HDN operators
-        hdnlib.notify_floatingip_update_association(floatingip_db)
-        # TODO(salv): Add operational status for floating IPs
-
-    def delete_floatingip(self, context, floatingip_id):
-        # TODO(salv): Add operational status for floating IPs
-        # Notify HDN operators
-        hdnlib.notify_floatingip_delete({'id': floatingip_id,
-                                         'tenant_id': context.tenant_id})
-        LOG.debug(_("Queued request to delete floating ip: %s"),
-                  floatingip_id)
-
-    def disassociate_floatingips(self, context, port_id):
-        # This method is redefined as this plugin does not use a RPC
-        # notifier, which would be against the HDN principles.
-        with context.session.begin(subtransactions=True):
-            try:
-                fip_qry = context.session.query(l3_db.FloatingIP)
-                floating_ip = fip_qry.filter_by(fixed_port_id=port_id).one()
-                floating_ip.update({'fixed_port_id': None,
-                                    'fixed_ip_address': None,
-                                    'router_id': None})
-                # Notify HDN operators for each floating IP
-                hdnlib.notify_floatingip_disassociate(floating_ip)
-            except sa_exc.NoResultFound:
-                return
-            except sa_exc.MultipleResultsFound:
-                # should never happen
-                raise Exception(_('Multiple floating IPs found for port %s'))
-
-    # GET operations for floating IPs are not redefined. The operation defined
-    # in NeutronDBPluginV2 is enough for the HDN plugin
