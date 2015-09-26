@@ -15,11 +15,11 @@
 
 from oslo_log import log
 from sqlalchemy.orm import exc as sa_exc
+from neutron.db import api as db_api
 from neutron.db import db_base_plugin_v2
 from neutron.db import external_net_db
 from neutron.db import l3_db
 from neutron.db import quota_db  # noqa
-from neutron.extensions import l3
 
 from hdn.common import config  # noqa
 from hdn.common import constants
@@ -29,8 +29,7 @@ LOG = log.getLogger(__name__)
 
 
 class HdnNeutronPlugin(db_base_plugin_v2.NeutronDbPluginV2,
-                       external_net_db.External_net_db_mixin,
-                       l3_db.L3_NAT_db_mixin):
+                       external_net_db.External_net_db_mixin):
 
     """Implement the Human-Defined-Networking plugin.
 
@@ -69,10 +68,6 @@ class HdnNeutronPlugin(db_base_plugin_v2.NeutronDbPluginV2,
     #     attribute
     supported_extension_aliases = ["external-net", "router"]
 
-    def __init__(self, configfile=None):
-        # TODO(salv-orlando): Validate configuration
-        pass
-
     def create_network(self, context, network):
         """ Instruct HDN operators to create a network
 
@@ -89,39 +84,35 @@ class HdnNeutronPlugin(db_base_plugin_v2.NeutronDbPluginV2,
 
         # Set the status of the network as 'PENDING CREATE'
         network['network']['status'] = constants.STATUS_PENDING_CREATE
-        with context.session.begin(subtransactions=True):
+        with db_api.autonested_transaction():
             new_net = super(HdnNeutronPlugin, self).create_network(
                 context, network)
-        # Use the HDN library to notify operators about the new network
 
-        LOG.debug(_("Queued request to create network: %s"), new_net['id'])
+        # Use the HDN library to notify operators about the new network
+        LOG.debug("Queued request to create network: %s", new_net['id'])
         hdnlib.notify_network_create(new_net)
         return new_net
 
-    def update_network(self, context, network_id, network):
-        # the update network operation is merely a db operation.
-        # No HDN request needs to be sent
-        with context.session.begin(subtransactions=True):
-            net = super(HdnNeutronPlugin, self).update_network(
-                context, network_id, network)
-        return net
+    # the update network operation is merely a db operation.
+    # The HDN plugin therefore does not override it.
 
-    def delete_network(self, context, network_id):
-        with context.session.begin(subtransactions=True):
-            # _get_network returns a sqlalchemy model
-            network = self._get_network(context, network_id)
-            if (context.is_admin and
-                network.status == constants.STATUS_PENDING_DELETE):
+    def delete_network(self, context, network_id, hdn_operator_call=False):
+        with db_api.autonested_transaction():
+            if hdn_operator_call:
                 # the network must be removed from the DB
                 super(HdnNeutronPlugin, self).delete_network(context,
                                                              network_id)
+                LOG.debug("Network delete operation for %s completed",
+                          network_id)
                 return
+            # _get_network returns a sqlalchemy model
+            network = self._get_network(context, network_id)
             # Set the status of the network as 'PENDING DELETE'
             network.status = constants.STATUS_PENDING_DELETE
 
         hdnlib.notify_network_delete({'id': network_id,
                                       'tenant_id': context.tenant_id})
-        LOG.debug(_("Queued request to delete network: %s"), network_id)
+        LOG.debug("Queued request to delete network: %s", network_id)
 
     # GET operations for networks are not redefined. The operation defined
     # in NeutronDBPluginV2 is enough for the HDN plugin
@@ -129,21 +120,22 @@ class HdnNeutronPlugin(db_base_plugin_v2.NeutronDbPluginV2,
     def create_port(self, context, port):
         # Set port status as PENDING_CREATE
         port['port']['status'] = constants.STATUS_PENDING_CREATE
-        with context.session.begin(subtransactions=True):
+        with db_api.autonested_transaction():
             new_port = super(HdnNeutronPlugin, self).create_port(
                 context, port)
         # Notify HDN operators
         hdnlib.notify_port_create(new_port)
-        LOG.debug(_("Queued request to create port: %s"), new_port['id'])
+        LOG.debug("Queued request to create port: %s", new_port['id'])
         return new_port
 
     def update_port(self, context, port_id, port):
-        with context.session.begin(subtransactions=True):
+        with db_api.autonested_transaction():
             original_port = super(HdnNeutronPlugin, self).get_port(
                 context, port_id)
             updated_port = super(HdnNeutronPlugin, self).update_port(
                 context, port_id, port)
 
+        # TODO(salv-orlando): check for more attribute changes
         if original_port['admin_state_up'] != updated_port['admin_state_up']:
             # Put the port in PENDING_UPDATE status
             # Notify HDN operators
@@ -151,26 +143,26 @@ class HdnNeutronPlugin(db_base_plugin_v2.NeutronDbPluginV2,
                 db_port = self._get_port(context, port_id)
                 db_port.status = constants.STATUS_PENDING_UPDATE
             hdnlib.notify_port_update(self._make_port_dict(db_port))
-            LOG.debug(_("Queued request to update port: %s"), port['id'])
+            LOG.debug("Queued request to update port: %s", port['id'])
         return updated_port
 
-    def delete_port(self, context, port_id, l3_port_check=True):
+    def delete_port(self, context, port_id, hdn_operator_call=False):
         # if needed, check to see if this is a port owned by
-        # and l3-router.  If so, we should prevent deletion.
-        if l3_port_check:
-            self.prevent_l3_port_deletion(context, port_id)
+        # a l3-router.  If so, we should prevent deletion.
+        # Therefore notify registry so that pre-delete checks can be run
         with context.session.begin(subtransactions=True):
             # _get_port returns a sqlalchemy model
             port = self._get_port(context, port_id)
-            if (context.is_admin and
-                port.status == constants.STATUS_PENDING_DELETE):
+            if hdn_operator_call:
                 # the port must be removed from the DB
                 super(HdnNeutronPlugin, self).delete_port(context, port_id)
+                LOG.debug("Port delete operation for %s completed",
+                          port_id)
                 return
-            # This is needed by L3 extension
-            self.disassociate_floatingips(context, port_id)
             # Put the port in PENDING_DELETE constants.STATUS
             port.status = constants.STATUS_PENDING_DELETE
+            # TODO(salv-orlando): Notify callback to disassociate floating IPs
+            # on l3 service plugin
         # Notify HDN operators
         hdnlib.notify_port_delete({'id': port_id,
                                    'tenant_id': context.tenant_id})
@@ -185,7 +177,7 @@ class HdnNeutronPlugin(db_base_plugin_v2.NeutronDbPluginV2,
             context, subnet)
         # Notify HDN operators
         hdnlib.notify_subnet_create(new_subnet)
-        LOG.debug(_("Queued request to create subnet: %s"), new_subnet['id'])
+        LOG.debug("Queued request to create subnet: %s", new_subnet['id'])
         return new_subnet
 
     def update_subnet(self, context, subnet_id, subnet):
@@ -193,18 +185,17 @@ class HdnNeutronPlugin(db_base_plugin_v2.NeutronDbPluginV2,
         subnet['subnet']['status'] = constants.STATUS_PENDING_UPDATE
         upd_subnet = super(HdnNeutronPlugin, self).update_subnet(
             context, subnet_id, subnet)
-        LOG.debug(_("Queued request to update subnet: %s"), subnet['id'])
+        LOG.debug("Queued request to update subnet: %s", subnet['id'])
         # Notify HDN operators
         hdnlib.notify_subnet_update(upd_subnet)
         return upd_subnet
 
-    def delete_subnet(self, context, subnet_id):
+    def delete_subnet(self, context, subnet_idi, hdn_operator_call=False):
         # Put the subnet in PENDING_DELETE status
-        with context.session.begin(subtransactions=True):
+        with db_api.autonested_transaction():
             # _get_subnet returns a sqlalchemy model
             subnet = self._get_subnet(context, subnet_id)
-            if (context.is_admin and
-                subnet.status == constants.STATUS_PENDING_DELETE):
+            if hdn_operator_call:
                 # the subnet must be removed from the DB
                 super(HdnNeutronPlugin, self).delete_subnet(context,
                                                             subnet_id)
@@ -213,4 +204,4 @@ class HdnNeutronPlugin(db_base_plugin_v2.NeutronDbPluginV2,
         # Notify HDN operators
         hdnlib.notify_subnet_delete({'id': subnet_id,
                                      'tenant_id': context.tenant_id})
-        LOG.debug(_("Queued request to delete subnet: %s"), subnet_id)
+        LOG.debug("Queued request to delete subnet: %s", subnet_id)
