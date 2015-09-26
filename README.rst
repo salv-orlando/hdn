@@ -1,5 +1,12 @@
+Welcome!
+========================================
+
+You have come across the Openstack Neutron plugin that harness
+the power of the most powerlod cloud networking backend ever
+conceived: your IT department.
+
 Human Defined Networking (HDN) plugin
-----------------------------------------
+========================================
 
 Forget the SDN hype, rediscover the human side of networking.
 Introducing the Human Defined Networking (HDN) plugin; thanks to its
@@ -13,12 +20,17 @@ your network infrastructure:
 - Worker HA
 - Worker capacity management (*)
 
+(*) might be subject to employment laws in certain countries
 
-(*) might be subject to employment laws in some specific countries
+Supported Neutron APIs
+-----------------------
 
-Supported Neutron APIs:
-1) Core
-2) L3 extension
+1) Core: network, port, and subnets
+2) L3 extension: routers and floating IPs
+3) Security group extension
+
+The plugin also support the HDN administrative interface, which is
+leverage by HDN operator to pick up tasks and report on their progress.
 
 All the remaining neutron extension are currently supported only through the
 direct queue exchange (usually located in the office kitchen)
