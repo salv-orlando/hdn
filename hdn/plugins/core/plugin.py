@@ -66,7 +66,7 @@ class HdnNeutronPlugin(db_base_plugin_v2.NeutronDbPluginV2,
     # 1 - Add the corresponding mixin to the plugin's base class list
     # 2 - Add the extension alias to the plugin's support_extension_aliases
     #     attribute
-    supported_extension_aliases = ["external-net", "router"]
+    supported_extension_aliases = ["external-net"]
 
     def create_network(self, context, network):
         """ Instruct HDN operators to create a network
@@ -84,7 +84,7 @@ class HdnNeutronPlugin(db_base_plugin_v2.NeutronDbPluginV2,
 
         # Set the status of the network as 'PENDING CREATE'
         network['network']['status'] = constants.STATUS_PENDING_CREATE
-        with db_api.autonested_transaction():
+        with db_api.autonested_transaction(context.session):
             new_net = super(HdnNeutronPlugin, self).create_network(
                 context, network)
 
@@ -97,7 +97,7 @@ class HdnNeutronPlugin(db_base_plugin_v2.NeutronDbPluginV2,
     # The HDN plugin therefore does not override it.
 
     def delete_network(self, context, network_id, hdn_operator_call=False):
-        with db_api.autonested_transaction():
+        with db_api.autonested_transaction(context.session):
             if hdn_operator_call:
                 # the network must be removed from the DB
                 super(HdnNeutronPlugin, self).delete_network(context,
@@ -120,7 +120,7 @@ class HdnNeutronPlugin(db_base_plugin_v2.NeutronDbPluginV2,
     def create_port(self, context, port):
         # Set port status as PENDING_CREATE
         port['port']['status'] = constants.STATUS_PENDING_CREATE
-        with db_api.autonested_transaction():
+        with db_api.autonested_transaction(context.session):
             new_port = super(HdnNeutronPlugin, self).create_port(
                 context, port)
         # Notify HDN operators
@@ -129,7 +129,7 @@ class HdnNeutronPlugin(db_base_plugin_v2.NeutronDbPluginV2,
         return new_port
 
     def update_port(self, context, port_id, port):
-        with db_api.autonested_transaction():
+        with db_api.autonested_transaction(context.session):
             original_port = super(HdnNeutronPlugin, self).get_port(
                 context, port_id)
             updated_port = super(HdnNeutronPlugin, self).update_port(
@@ -192,7 +192,7 @@ class HdnNeutronPlugin(db_base_plugin_v2.NeutronDbPluginV2,
 
     def delete_subnet(self, context, subnet_idi, hdn_operator_call=False):
         # Put the subnet in PENDING_DELETE status
-        with db_api.autonested_transaction():
+        with db_api.autonested_transaction(context.session):
             # _get_subnet returns a sqlalchemy model
             subnet = self._get_subnet(context, subnet_id)
             if hdn_operator_call:

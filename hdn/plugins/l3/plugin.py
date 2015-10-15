@@ -14,6 +14,8 @@
 #    under the License.
 
 from oslo_log import log
+from neutron.plugins.common import constants as plugin_constants
+from neutron.db import l3_db
 
 from hdn.common import constants
 from hdn.common import hdnlib
@@ -22,6 +24,13 @@ LOG = log.getLogger(__name__)
 
 
 class HdnL3Plugin(l3_db.L3_NAT_db_mixin):
+
+    def get_plugin_type(self):
+        # Tell Neutron this is a L3 service plugin
+        return plugin_constants.L3_ROUTER_NAT
+
+    def get_plugin_description(self):
+        return "HDN - the ultimate solution for L3 networking in your cloud"
 
     def create_router(self, context, router):
         # Put the router in PENDING CREATE
