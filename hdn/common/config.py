@@ -14,7 +14,7 @@
 #    License for the specific language governing permissions and limitations
 #    under the License.
 
-from oslo.config import cfg
+from oslo_config import cfg
 
 hdn_opts = [
     cfg.StrOpt('smtp_user', help=_("SMTP user name")),

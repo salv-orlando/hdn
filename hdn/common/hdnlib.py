@@ -19,7 +19,7 @@ from email.MIMEText import MIMEText
 import itertools
 import smtplib
 
-from oslo.config import cfg
+from oslo_config import cfg
 
 
 def send_mail(subject, text):
