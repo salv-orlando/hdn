@@ -39,6 +39,8 @@ set +o xtrace
 HDN_DIR=$DEST/hdn
 
 
+# These functions are hooks that are invoked by DevStack's Neutron
+# plugin setup code; they must all be no-ops for HDN
 function neutron_plugin_setup_interface_driver {
     :
 }
@@ -56,7 +58,28 @@ function neutron_plugin_create_nova_conf {
 
 # OVS is evil
 function is_neutron_ovs_base_plugin {
+    return 1
+}
+
+
+function has_neutron_plugin_security_group {
+    # 0 means True here
     return 0
+}
+
+
+function neutron_plugin_install_agent_packages {
+    :
+}
+
+
+function neutron_plugin_configure_dhcp_agent {
+    :
+}
+
+
+function neutron_plugin_configure_l3_agent {
+    :
 }
 
 
@@ -67,6 +90,13 @@ function configure_hdn_plugin {
     export NETWORK_API_EXTENSIONS='quotas,external-net,router,security-group'
     iniset $NEUTRON_CONF DEFAULT core_plugin "$Q_PLUGIN_CLASS"
     iniset $NEUTRON_CONF DEFAULT service_plugins  "$Q_SERVICE_PLUGIN_CLASSES"
+    iniset /$Q_PLUGIN_CONF_FILE HDN smtp_user "$HDN_SMTP_USER"
+    iniset /$Q_PLUGIN_CONF_FILE HDN smtp_password  "$HDN_SMTP_PASSWORD"
+    iniset /$Q_PLUGIN_CONF_FILE HDN smtp_server "$HDN_SMTP_SERVER"
+    if [[ -n "$HDN_SMTP_PORT" ]]; then
+        iniset /$Q_PLUGIN_CONF_FILE HDN smtp_port "$HDN_SMTP_PORT"
+    fi
+    iniset /$Q_PLUGIN_CONF_FILE HDN recipients "$RECIPIENTS"
 }
 
 
