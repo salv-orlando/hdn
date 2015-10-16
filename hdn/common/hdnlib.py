@@ -14,8 +14,8 @@
 #    License for the specific language governing permissions and limitations
 #    under the License
 
-from email.MIMEMultipart import MIMEMultipart
-from email.MIMEText import MIMEText
+from email.mime import multipart
+from email.mime import text as mimetext
 import itertools
 import smtplib
 
@@ -23,11 +23,11 @@ from oslo_config import cfg
 
 
 def send_mail(subject, text):
-    msg = MIMEMultipart()
+    msg = multipart.MIMEMultipart()
     msg['From'] = cfg.CONF.HDN.smtp_user
     msg['To'] = ",".join(cfg.CONF.HDN.recipients)
     msg['Subject'] = subject
-    msg.attach(MIMEText(text))
+    msg.attach(mimetext.MIMEText(text))
     mailServer = smtplib.SMTP(cfg.CONF.HDN.smtp_server,
                               cfg.CONF.HDN.smtp_port)
     mailServer.ehlo()

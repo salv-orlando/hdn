@@ -13,13 +13,12 @@
 #    License for the specific language governing permissions and limitations
 #    under the License.
 
-from oslo_log import log
-from sqlalchemy.orm import exc as sa_exc
 from neutron.db import api as db_api
 from neutron.db import db_base_plugin_v2
 from neutron.db import external_net_db
-from neutron.db import l3_db
 from neutron.db import quota_db  # noqa
+
+from oslo_log import log
 
 from hdn.common import config  # noqa
 from hdn.common import constants
@@ -69,7 +68,7 @@ class HdnNeutronPlugin(db_base_plugin_v2.NeutronDbPluginV2,
     supported_extension_aliases = ["external-net"]
 
     def create_network(self, context, network):
-        """ Instruct HDN operators to create a network
+        """Instruct HDN operators to create a network
 
         This function implements the "network create" Neutron API operation.
 
@@ -80,6 +79,7 @@ class HdnNeutronPlugin(db_base_plugin_v2.NeutronDbPluginV2,
         (context.is_admin)
 
         @param network - A dict containing data of the network to be created
+
         """
 
         # Set the status of the network as 'PENDING CREATE'
@@ -190,7 +190,7 @@ class HdnNeutronPlugin(db_base_plugin_v2.NeutronDbPluginV2,
         hdnlib.notify_subnet_update(upd_subnet)
         return upd_subnet
 
-    def delete_subnet(self, context, subnet_idi, hdn_operator_call=False):
+    def delete_subnet(self, context, subnet_id, hdn_operator_call=False):
         # Put the subnet in PENDING_DELETE status
         with db_api.autonested_transaction(context.session):
             # _get_subnet returns a sqlalchemy model

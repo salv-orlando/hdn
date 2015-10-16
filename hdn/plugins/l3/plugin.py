@@ -13,9 +13,11 @@
 #    License for the specific language governing permissions and limitations
 #    under the License.
 
-from oslo_log import log
-from neutron.plugins.common import constants as plugin_constants
 from neutron.db import l3_db
+from neutron.plugins.common import constants as plugin_constants
+
+from oslo_log import log
+from sqlalchemy.orm import exc as sa_exc
 
 from hdn.common import constants
 from hdn.common import hdnlib
@@ -35,7 +37,7 @@ class HdnL3Plugin(l3_db.L3_NAT_db_mixin):
     def create_router(self, context, router):
         # Put the router in PENDING CREATE
         router['router']['status'] = constants.STATUS_PENDING_CREATE
-        new_router = super(HdnNeutronPlugin, self).create_router(
+        new_router = super(HdnL3Plugin, self).create_router(
             context, router)
         # Notify HDN operators
         hdnlib.notify_router_create(new_router)
@@ -45,7 +47,7 @@ class HdnL3Plugin(l3_db.L3_NAT_db_mixin):
     def update_router(self, context, router_id, router):
         # Put the router in PENDING_UPDATE
         router['router']['status'] = constants.STATUS_PENDING_UPDATE
-        upd_router = super(HdnNeutronPlugin, self).update_router(
+        upd_router = super(HdnL3Plugin, self).update_router(
             context, router)
         # Notify HDN operators
         hdnlib.notify_router_update(upd_router)
@@ -55,7 +57,7 @@ class HdnL3Plugin(l3_db.L3_NAT_db_mixin):
     def delete_router(self, context, router_id, router):
         # Put the router in PENDING_DELETE status
         with context.session.begin(subtransactions=True):
-            router = self._ensure_router_not_in_use(router_id)
+            router = self._ensure_router_not_in_use(context, router_id)
             router.status = constants.STATUS_PENDING_DELETE
         # Notify HDN operators
         hdnlib.notify_router_delete({'id': router_id,
@@ -70,10 +72,10 @@ class HdnL3Plugin(l3_db.L3_NAT_db_mixin):
 
         This method is invoked by create_floatingip and update_floatingip.
         """
-        super(HdnNeutronPlugin, self).update_fip_assoc(
+        super(HdnL3Plugin, self).update_fip_assoc(
             context, fip, floatingip_db, external_port)
         self.update_floatingip_status(
-            fip['id'], constants.STATUS_PENDING_UPDATE)
+            context, fip['id'], constants.STATUS_PENDING_UPDATE)
         # Notify HDN operators
         hdnlib.notify_floatingip_update_association(floatingip_db)
 
@@ -83,7 +85,7 @@ class HdnL3Plugin(l3_db.L3_NAT_db_mixin):
         hdnlib.notify_floatingip_delete({'id': floatingip_id,
                                          'tenant_id': context.tenant_id})
         self.update_floatingip_status(
-            floatingip_id, constants.STATUS_PENDING_DELETE)
+            context, floatingip_id, constants.STATUS_PENDING_DELETE)
         LOG.debug(_("Queued request to delete floating ip: %s"),
                   floatingip_id)
 
@@ -97,7 +99,8 @@ class HdnL3Plugin(l3_db.L3_NAT_db_mixin):
                 floating_ip.update({'fixed_port_id': None,
                                     'fixed_ip_address': None,
                                     'router_id': None})
-                self.update_floatingip_status(fip['id'],
+                self.update_floatingip_status(context,
+                                              floating_ip['id'],
                                               constants.STATUS_PENDING_UPDATE)
                 # Notify HDN operators for each floating IP
                 hdnlib.notify_floatingip_disassociate(floating_ip)
