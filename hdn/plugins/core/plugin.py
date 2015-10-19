@@ -147,7 +147,8 @@ class HdnNeutronPlugin(db_base_plugin_v2.NeutronDbPluginV2,
             LOG.debug("Queued request to update port: %s", port['id'])
         return updated_port
 
-    def delete_port(self, context, port_id, hdn_operator_call=False):
+    def delete_port(self, context, port_id, hdn_operator_call=False,
+                    l3_port_check=True):
         # if needed, check to see if this is a port owned by
         # a l3-router.  If so, we should prevent deletion.
         # Therefore notify registry so that pre-delete checks can be run

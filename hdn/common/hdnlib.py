@@ -111,6 +111,18 @@ def notify_router_delete(router_data):
     send_mail(subject, message)
 
 
+def notify_router_interface_add(router_data):
+    subject = "[HDN] Add router interface request:%s" % router_data['id']
+    message = "Request coming from tenant:%s" % router_data['tenant_id']
+    send_mail(subject, message)
+
+
+def notify_router_interface_remove(router_data):
+    subject = "[HDN] Remove router interface request:%s" % router_data['id']
+    message = "Request coming from tenant:%s" % router_data['tenant_id']
+    send_mail(subject, message)
+
+
 def notify_floatingip_update_association(floatingip_data):
     subject = ("[HDN] Floating IP association updated for:%s" %
                floatingip_data['id'])

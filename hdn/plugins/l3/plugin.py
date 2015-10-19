@@ -15,6 +15,7 @@
 
 from neutron.db import common_db_mixin
 from neutron.db import extraroute_db
+from neutron.db import l3_db
 from neutron.plugins.common import constants as plugin_constants
 from neutron.services import service_base
 
@@ -69,6 +70,18 @@ class HdnL3Plugin(service_base.ServicePluginBase,
         hdnlib.notify_router_delete({'id': router_id,
                                      'tenant_id': context.tenant_id})
         LOG.debug(_("Queued request to delete router: %s"), router_id)
+
+    def add_router_interface(self, context, router_id, interface_info):
+        super(HdnL3Plugin, self).add_router_interface(
+            context, router_id, interface_info)
+        hdnlib.notify_router_interface_add(
+            {'id': router_id, 'tenant_id': context.tenant_id})
+
+    def remove_router_interface(self, context, router_id, interface_info):
+        super(HdnL3Plugin, self).remove_router_interface(
+            context, router_id, interface_info)
+        hdnlib.notify_router_interface_remove(
+            {'id': router_id, 'tenant_id': context.tenant_id})
 
     # GET operations for routers are not redefined. The operation defined
     # in NeutronDBPluginV2 is enough for the HDN plugin
