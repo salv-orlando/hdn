@@ -87,6 +87,7 @@ class HdnNeutronPlugin(db_base_plugin_v2.NeutronDbPluginV2,
         with db_api.autonested_transaction(context.session):
             new_net = super(HdnNeutronPlugin, self).create_network(
                 context, network)
+            self._process_l3_create(context, new_net, network['network'])
 
         # Use the HDN library to notify operators about the new network
         LOG.debug("Queued request to create network: %s", new_net['id'])

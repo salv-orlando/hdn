@@ -13,8 +13,10 @@
 #    License for the specific language governing permissions and limitations
 #    under the License.
 
-from neutron.db import l3_db
+from neutron.db import common_db_mixin
+from neutron.db import extraroute_db
 from neutron.plugins.common import constants as plugin_constants
+from neutron.services import service_base
 
 from oslo_log import log
 from sqlalchemy.orm import exc as sa_exc
@@ -25,7 +27,11 @@ from hdn.common import hdnlib
 LOG = log.getLogger(__name__)
 
 
-class HdnL3Plugin(l3_db.L3_NAT_db_mixin):
+class HdnL3Plugin(service_base.ServicePluginBase,
+                  common_db_mixin.CommonDbMixin,
+                  extraroute_db.ExtraRoute_dbonly_mixin):
+
+    supported_extension_aliases = ["router", "ext-gw-mode", "extraroute"]
 
     def get_plugin_type(self):
         # Tell Neutron this is a L3 service plugin
@@ -48,10 +54,10 @@ class HdnL3Plugin(l3_db.L3_NAT_db_mixin):
         # Put the router in PENDING_UPDATE
         router['router']['status'] = constants.STATUS_PENDING_UPDATE
         upd_router = super(HdnL3Plugin, self).update_router(
-            context, router)
+            context, router_id, router)
         # Notify HDN operators
         hdnlib.notify_router_update(upd_router)
-        LOG.debug("Queued request to update router: %s", router['id'])
+        LOG.debug("Queued request to update router: %s", router_id)
         return upd_router
 
     def delete_router(self, context, router_id, router):

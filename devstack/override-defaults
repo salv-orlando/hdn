@@ -1,5 +1,6 @@
 Q_PLUGIN="hdn"
 Q_L3_ENABLED=True
+Q_USE_DEBUG_COMMAND=False
 
 function neutron_plugin_configure_common {
     Q_PLUGIN_CLASS="hdn.plugins.core.plugin.HdnNeutronPlugin"
