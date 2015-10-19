@@ -96,7 +96,7 @@ function configure_hdn_plugin {
     if [[ -n "$HDN_SMTP_PORT" ]]; then
         iniset /$Q_PLUGIN_CONF_FILE HDN smtp_port "$HDN_SMTP_PORT"
     fi
-    iniset /$Q_PLUGIN_CONF_FILE HDN recipients "$RECIPIENTS"
+    iniset /$Q_PLUGIN_CONF_FILE HDN recipients "$HDN_RECIPIENTS"
 }
 
 
