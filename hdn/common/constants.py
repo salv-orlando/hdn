@@ -13,6 +13,8 @@
 #    License for the specific language governing permissions and limitations
 #    under the License.
 
+HDN_TASK = 'HDN_TASK'
+
 STATUS_PENDING_CREATE = 'PENDING_CREATE'
 STATUS_PENDING_UPDATE = 'PENDING_UPDATE'
 STATUS_PENDING_DELETE = 'PENDING_DELETE'
