@@ -18,14 +18,14 @@ from neutron.services import service_base
 
 from oslo_log import log
 
-from hdn.extensions import tasks
 from hdn.common import constants
+from hdn.extensions import hdntasks
 
 LOG = log.getLogger(__name__)
 
 
 class HdnTasksPlugin(service_base.ServicePluginBase,
-                     tasks.HdnTaskPluginBase,
+                     hdntasks.HdnTaskPluginBase,
                      common_db_mixin.CommonDbMixin):
 
     supported_extension_aliases = ["hdn-tasks"]
