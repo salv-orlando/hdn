@@ -76,8 +76,7 @@ class Hdntasks(extensions.ExtensionDescriptor):
         attributes.PLURALS.update(plural_mappings)
         resources = resource_helper.build_resource_info(plural_mappings,
                                                         RESOURCE_ATTRIBUTE_MAP,
-                                                        constants.HDN_TASKS)
-
+                                                        constants.HDN_TASK)
         return resources
 
     def get_extended_resources(self, version):

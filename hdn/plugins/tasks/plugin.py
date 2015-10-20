@@ -41,9 +41,11 @@ class HdnTasksPlugin(service_base.ServicePluginBase,
                   sorts=None, limit=None, marker=None,
                   page_reverse=False):
         LOG.debug("List tasks stub")
+        return []
 
     def get_task(self, context, task_id, fields=None):
         LOG.debug("Get task stub")
+        return {}
 
     def create_task(self, context, task_info):
         LOG.debug("Create task stub")
