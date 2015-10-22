@@ -1,0 +1,3 @@
+Q_PLUGIN="hdn"
+Q_L3_ENABLED=True
+Q_USE_DEBUG_COMMAND=False

@@ -83,9 +83,18 @@ function neutron_plugin_configure_l3_agent {
 }
 
 
+function neutron_plugin_configure_service {
+    cp $HDN_DIR/etc/* /$Q_PLUGIN_CONF_PATH -R
+}
+
+
+function run_hdn_migrations {
+   $NEUTRON_BIN_DIR/neutron-db-manage --config-file $NEUTRON_CONF --config-file /$Q_PLUGIN_CONF_FILE --subproject hdn upgrade heads
+}
+
+
 function configure_hdn_plugin {
     echo "Configuring Neutron for enabling HDN"
-
     # Tempest uses this variable for determining which tests should be run
     export NETWORK_API_EXTENSIONS='quotas,external-net,router,security-group'
     iniset $NEUTRON_CONF DEFAULT core_plugin "$Q_PLUGIN_CLASS"
@@ -100,10 +109,33 @@ function configure_hdn_plugin {
 }
 
 
-if [[ "$1" == "stack" && "$2" == "post-config" ]]; then
-    configure_hdn_plugin
-    if is_service_enabled nova; then
-        create_nova_conf_neutron
+# main loop
+if is_service_enabled hdn; then
+    if [[ "$1" == "source" ]]; then
+        # no-op
+        :
+    elif [[ "$1" == "stack" && "$2" == "install" ]]; then
+        # no-op
+        :
+    elif [[ "$1" == "stack" && "$2" == "post-config" ]]; then
+        configure_hdn_plugin
+        if is_service_enabled nova; then
+            create_nova_conf_neutron
+        fi
+        run_hdn_migrations
+    elif [[ "$1" == "stack" && "$2" == "post-extra" ]]; then
+        # no-op
+        :
+    fi
+
+    if [[ "$1" == "unstack" ]]; then
+        # no-op
+        :
+    fi
+
+    if [[ "$1" == "clean" ]]; then
+        # no-op
+        :
     fi
 fi
 
