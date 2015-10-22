@@ -1,4 +1,6 @@
-# Copyright 2015 Meh, Inc
+# Copyright 2013 VMware, Inc.
+#
+# All Rights Reserved.
 #
 #    Licensed under the Apache License, Version 2.0 (the "License"); you may
 #    not use this file except in compliance with the License. You may obtain
@@ -11,4 +13,19 @@
 #    WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied. See the
 #    License for the specific language governing permissions and limitations
 #    under the License.
-VERSION_TABLE = 'alembic_version_hdn'
+
+
+import sqlalchemy as sa
+
+from neutron.db import model_base
+
+
+class HdnTask(model_base.BASEV2,
+              model_base.HasID,
+              model_base.HastTenant,
+              model_base.HasStatusDescription):
+    """Represents a HDN Task"""
+
+    action = sa.Column(sa.String(64), nullable=False)
+    object_id = sa.Column(sa.String(36), nullable=False)
+    object_type = sa.Column(sa.String(36), nullable=False)

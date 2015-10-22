@@ -1,4 +1,4 @@
-# Copyright 2015 Meh, Inc
+# Copyright 2015 MoarMeh, Inc.
 #
 #    Licensed under the Apache License, Version 2.0 (the "License"); you may
 #    not use this file except in compliance with the License. You may obtain
@@ -11,4 +11,24 @@
 #    WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied. See the
 #    License for the specific language governing permissions and limitations
 #    under the License.
-VERSION_TABLE = 'alembic_version_hdn'
+#
+
+"""Initial Liberty no-op expand migration.
+
+Revision ID: liberty_exp
+Revises: kilo
+Create Date: 2015-10-01
+
+"""
+
+from neutron.db.migration import cli
+
+
+# revision identifiers, used by Alembic.
+revision = 'liberty_exp'
+down_revision = 'kilo'
+branch_labels = (cli.EXPAND_BRANCH,)
+
+
+def upgrade():
+    pass
