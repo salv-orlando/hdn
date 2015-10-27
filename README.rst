@@ -27,7 +27,7 @@ Supported Neutron APIs
 
 1) Core: network, port, and subnets
 2) L3 extension: routers and floating IPs
-3) Security group extension
+3) Security group extension (in progress)
 
 The plugin also support the HDN administrative interface, which is
 leverage by HDN operator to pick up tasks and report on their progress.
