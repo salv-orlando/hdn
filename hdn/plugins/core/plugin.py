@@ -13,6 +13,9 @@
 #    License for the specific language governing permissions and limitations
 #    under the License.
 
+from neutron.callbacks import events
+from neutron.callbacks import registry
+from neutron.callbacks import resources
 from neutron.db import api as db_api
 from neutron.db import db_base_plugin_v2
 from neutron.db import external_net_db
@@ -92,6 +95,11 @@ class HdnNeutronPlugin(db_base_plugin_v2.NeutronDbPluginV2,
         # Use the HDN library to notify operators about the new network
         LOG.debug("Queued request to create network: %s", new_net['id'])
         hdnlib.notify_network_create(new_net)
+        # Network is not present in neutron.callbacks.resources
+        # TODO(salv-orlando): do not use literal for resource name
+        registry.notify('NETWORK', events.AFTER_CREATE, self,
+                        tenant_id=context.tenant_id,
+                        resource_id=new_net['id'])
         return new_net
 
     # the update network operation is merely a db operation.
@@ -110,10 +118,16 @@ class HdnNeutronPlugin(db_base_plugin_v2.NeutronDbPluginV2,
             network = self._get_network(context, network_id)
             # Set the status of the network as 'PENDING DELETE'
             network.status = constants.STATUS_PENDING_DELETE
-
-        hdnlib.notify_network_delete({'id': network_id,
-                                      'tenant_id': context.tenant_id})
-        LOG.debug("Queued request to delete network: %s", network_id)
+        if not hdn_operator_call:
+            # This is not really 'after delete', but the meaning here is that
+            # AFTER_DELETE is the event to trigger at completion of the delete
+            # operation
+            registry.notify('NETWORK', events.AFTER_DELETE, self,
+                            tenant_id=context.tenant_id,
+                            resource_id=network_id)
+            hdnlib.notify_network_delete({'id': network_id,
+                                          'tenant_id': context.tenant_id})
+            LOG.debug("Queued request to delete network: %s", network_id)
 
     # GET operations for networks are not redefined. The operation defined
     # in NeutronDBPluginV2 is enough for the HDN plugin
@@ -124,6 +138,9 @@ class HdnNeutronPlugin(db_base_plugin_v2.NeutronDbPluginV2,
         with db_api.autonested_transaction(context.session):
             new_port = super(HdnNeutronPlugin, self).create_port(
                 context, port)
+        registry.notify(resources.PORT, events.AFTER_CREATE, self,
+                        tenant_id=context.tenant_id,
+                        resource_id=new_port['id'])
         # Notify HDN operators
         hdnlib.notify_port_create(new_port)
         LOG.debug("Queued request to create port: %s", new_port['id'])
@@ -139,10 +156,13 @@ class HdnNeutronPlugin(db_base_plugin_v2.NeutronDbPluginV2,
         # TODO(salv-orlando): check for more attribute changes
         if original_port['admin_state_up'] != updated_port['admin_state_up']:
             # Put the port in PENDING_UPDATE status
-            # Notify HDN operators
             with context.session.begin(subtransactions=True):
                 db_port = self._get_port(context, port_id)
                 db_port.status = constants.STATUS_PENDING_UPDATE
+                registry.notify(resources.PORT, events.AFTER_UPDATE, self,
+                                tenant_id=context.tenant_id,
+                                resource_id=port_id)
+            # Notify HDN operators
             hdnlib.notify_port_update(self._make_port_dict(db_port))
             LOG.debug("Queued request to update port: %s", port['id'])
         return updated_port
@@ -165,10 +185,16 @@ class HdnNeutronPlugin(db_base_plugin_v2.NeutronDbPluginV2,
             port.status = constants.STATUS_PENDING_DELETE
             # TODO(salv-orlando): Notify callback to disassociate floating IPs
             # on l3 service plugin
-        # Notify HDN operators
-        hdnlib.notify_port_delete({'id': port_id,
-                                   'tenant_id': context.tenant_id})
-        LOG.debug(_("Queued request to delete port: %s"), port_id)
+        if not hdn_operator_call:
+            registry.notify(resources.PORT, events.AFTER_DELETE, self,
+                            tenant_id=context.tenant_id,
+                            resource_id=port_id)
+            # Notify HDN operators
+            hdnlib.notify_port_delete({'id': port_id,
+                                       'tenant_id': context.tenant_id})
+            LOG.debug(_("Queued request to delete port: %s"), port_id)
+        else:
+            LOG.debug(_("Port %s destroyed"), port_id)
 
     # GET operations for ports are not redefined. The operation defined
     # in NeutronDBPluginV2 is enough for the HDN plugin
@@ -177,6 +203,9 @@ class HdnNeutronPlugin(db_base_plugin_v2.NeutronDbPluginV2,
         subnet['subnet']['status'] = constants.STATUS_PENDING_CREATE
         new_subnet = super(HdnNeutronPlugin, self).create_subnet(
             context, subnet)
+        registry.notify(resources.SUBNET, events.AFTER_CREATE, self,
+                        tenant_id=context.tenant_id,
+                        resource_id=new_subnet['id'])
         # Notify HDN operators
         hdnlib.notify_subnet_create(new_subnet)
         LOG.debug("Queued request to create subnet: %s", new_subnet['id'])
@@ -188,6 +217,9 @@ class HdnNeutronPlugin(db_base_plugin_v2.NeutronDbPluginV2,
         upd_subnet = super(HdnNeutronPlugin, self).update_subnet(
             context, subnet_id, subnet)
         LOG.debug("Queued request to update subnet: %s", subnet['id'])
+        registry.notify(resources.SUBNET, events.AFTER_UPDATE, self,
+                        tenant_id=context.tenant_id,
+                        resource_id=subnet_id)
         # Notify HDN operators
         hdnlib.notify_subnet_update(upd_subnet)
         return upd_subnet
@@ -203,7 +235,11 @@ class HdnNeutronPlugin(db_base_plugin_v2.NeutronDbPluginV2,
                                                             subnet_id)
                 return
             subnet.status = constants.STATUS_PENDING_DELETE
-        # Notify HDN operators
-        hdnlib.notify_subnet_delete({'id': subnet_id,
-                                     'tenant_id': context.tenant_id})
-        LOG.debug("Queued request to delete subnet: %s", subnet_id)
+        if not hdn_operator_call:
+            registry.notify(resources.SUBNET, events.AFTER_DELETE, self,
+                            tenant_id=context.tenant_id,
+                            resource_id=subnet_id)
+            # Notify HDN operators
+            hdnlib.notify_subnet_delete({'id': subnet_id,
+                                         'tenant_id': context.tenant_id})
+            LOG.debug("Queued request to delete subnet: %s", subnet_id)

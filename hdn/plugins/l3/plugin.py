@@ -13,6 +13,9 @@
 #    License for the specific language governing permissions and limitations
 #    under the License.
 
+from neutron.callbacks import events
+from neutron.callbacks import registry
+from neutron.callbacks import resources
 from neutron.db import common_db_mixin
 from neutron.db import extraroute_db
 from neutron.db import l3_db
@@ -46,6 +49,9 @@ class HdnL3Plugin(service_base.ServicePluginBase,
         router['router']['status'] = constants.STATUS_PENDING_CREATE
         new_router = super(HdnL3Plugin, self).create_router(
             context, router)
+        registry.notify(resources.ROUTER, events.AFTER_CREATE, self,
+                        tenant_id=context.tenant_id,
+                        resource_id=new_router['id'])
         # Notify HDN operators
         hdnlib.notify_router_create(new_router)
         LOG.debug("Queued request to create router: %s", new_router['id'])
@@ -56,19 +62,27 @@ class HdnL3Plugin(service_base.ServicePluginBase,
         router['router']['status'] = constants.STATUS_PENDING_UPDATE
         upd_router = super(HdnL3Plugin, self).update_router(
             context, router_id, router)
+        registry.notify(resources.ROUTER, events.AFTER_UPDATE, self,
+                        tenant_id=context.tenant_id,
+                        resource_id=router_id)
         # Notify HDN operators
         hdnlib.notify_router_update(upd_router)
         LOG.debug("Queued request to update router: %s", router_id)
         return upd_router
 
-    def delete_router(self, context, router_id, router):
+    def delete_router(self, context, router_id, router,
+                      hdn_operator_call=False):
         # Put the router in PENDING_DELETE status
         with context.session.begin(subtransactions=True):
             router = self._ensure_router_not_in_use(context, router_id)
             router.status = constants.STATUS_PENDING_DELETE
-        # Notify HDN operators
-        hdnlib.notify_router_delete({'id': router_id,
-                                     'tenant_id': context.tenant_id})
+        if not hdn_operator_call:
+            registry.notify(resources.ROUTER, events.AFTER_DELETE, self,
+                            tenant_id=context.tenant_id,
+                            resource_id=router_id)
+            # Notify HDN operators
+            hdnlib.notify_router_delete({'id': router_id,
+                                        'tenant_id': context.tenant_id})
         LOG.debug(_("Queued request to delete router: %s"), router_id)
 
     def add_router_interface(self, context, router_id, interface_info):
@@ -98,11 +112,16 @@ class HdnL3Plugin(service_base.ServicePluginBase,
         # Notify HDN operators
         hdnlib.notify_floatingip_update_association(floatingip_db)
 
-    def delete_floatingip(self, context, floatingip_id):
+    def delete_floatingip(self, context, floatingip_id,
+                          hdn_operator_call=False):
         # TODO(salv): Add operational status for floating IPs
-        # Notify HDN operators
-        hdnlib.notify_floatingip_delete({'id': floatingip_id,
-                                         'tenant_id': context.tenant_id})
+        if not hdn_operator_call:
+            registry.notify('FLOATING_IP', events.AFTER_DELETE, self,
+                            tenant_id=context.tenant_id,
+                            resource_id=floatingip_id)
+            # Notify HDN operators
+            hdnlib.notify_floatingip_delete({'id': floatingip_id,
+                                            'tenant_id': context.tenant_id})
         self.update_floatingip_status(
             context, floatingip_id, constants.STATUS_PENDING_DELETE)
         LOG.debug(_("Queued request to delete floating ip: %s"),
